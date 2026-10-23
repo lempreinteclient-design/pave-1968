@@ -40,7 +40,7 @@ Carte de test : `4242 4242 4242 4242`, date future, CVC quelconque.
 
 1. Pousse ce dépôt sur GitHub.
 2. Sur vercel.com, « Add New Project » > importe le dépôt.
-3. Ajoute les variables de `.env.example` dans Settings > Environment Variables, avec `NEXT_PUBLIC_SITE_URL` = l'URL Vercel ou ton domaine.
+3. Ajoute les variables de `.env.example` dans Settings > Environment Variables. `NEXT_PUBLIC_SITE_URL` est facultatif sur Vercel (l'adresse de production est détectée), à remplir seulement avec un domaine perso.
 4. Déploie, puis crée le webhook Stripe avec l'URL de production.
 
 ## Avant d'ouvrir
