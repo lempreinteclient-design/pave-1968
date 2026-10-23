@@ -64,7 +64,7 @@ export async function POST(req: Request) {
       },
     ],
     // Le webhook relit le panier ici pour créer la commande Printify (limite Stripe : 500 caractères)
-    metadata: { cart: JSON.stringify(items.map((i) => [i.productId, i.variantId, i.quantity])) },
+    metadata: { shop: "pave-1968", cart: JSON.stringify(items.map((i) => [i.productId, i.variantId, i.quantity])) },
     success_url: `${siteUrl()}/merci?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${siteUrl()}/panier`,
   });

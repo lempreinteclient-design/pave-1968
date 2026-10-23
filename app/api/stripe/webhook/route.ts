@@ -21,7 +21,10 @@ export async function POST(req: Request) {
   }
 
   const session = event.data.object;
-  if (session.payment_status !== "paid") return NextResponse.json({ received: true });
+  // Le compte Stripe peut servir à d'autres boutiques : on ignore les paiements qui ne viennent pas de ce site
+  if (session.metadata?.shop !== "pave-1968" || session.payment_status !== "paid") {
+    return NextResponse.json({ received: true });
+  }
 
   try {
     const cart = JSON.parse(session.metadata?.cart ?? "[]") as [string, number, number][];
