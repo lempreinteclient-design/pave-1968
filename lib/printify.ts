@@ -37,6 +37,7 @@ type RawProduct = {
   title: string;
   description: string;
   visible: boolean;
+  is_locked?: boolean;
   images: { src: string; variant_ids: number[]; is_default: boolean }[];
   options: { name: string; type: string; values: { id: number; title: string; colors?: string[] }[] }[];
   variants: { id: number; title: string; price: number; is_enabled: boolean; is_available?: boolean; options: number[] }[];
@@ -67,7 +68,19 @@ function normalize(p: RawProduct): Product {
 export async function listProducts(): Promise<Product[]> {
   const { shopId } = config();
   const res = await call<{ data: RawProduct[] }>(`/shops/${shopId}/products.json?limit=50`, { revalidate: 300 });
-  return res.data.filter((p) => p.visible !== false).map(normalize);
+  // Un produit sur lequel tu as cliqué "Publish" reste "Publishing" (verrouillé) dans Printify
+  // tant que le site n'a pas confirmé la publication : on la confirme ici.
+  const publishing = res.data.filter((p) => p.is_locked);
+  await Promise.all(publishing.map((p) => confirmPublished(p.id).catch((err) => console.error(err))));
+  return res.data.filter((p) => p.visible || p.is_locked).map(normalize);
+}
+
+async function confirmPublished(productId: string) {
+  const { shopId } = config();
+  await call(`/shops/${shopId}/products/${productId}/publishing_succeeded.json`, {
+    method: "POST",
+    body: JSON.stringify({ external: { id: productId, handle: `/produit/${productId}` } }),
+  });
 }
 
 export async function getProduct(id: string): Promise<Product | null> {
