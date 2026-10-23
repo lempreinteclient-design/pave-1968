@@ -19,11 +19,10 @@ npm run dev                  # http://localhost:3000
 
 1. Sur printify.com, crée une boutique de type **API / Custom integration** (Manage my stores > Add new store > API).
 2. Mon compte > Connections : génère un **API token** avec les droits `shops`, `products` et `orders`. Mets-le dans `PRINTIFY_API_TOKEN`.
-3. Trouve l'identifiant de la boutique :
+3. `PRINTIFY_SHOP_ID` est facultatif : sans lui, le site prend ta boutique « API » (ou la première du compte). Pour forcer une boutique précise :
    ```bash
    curl -H "Authorization: Bearer TON_TOKEN" https://api.printify.com/v1/shops.json
    ```
-   Copie le champ `id` de la boutique API dans `PRINTIFY_SHOP_ID`.
 4. Crée tes produits dans Printify (choisis un imprimeur européen), fixe le prix de vente : ils apparaissent sur le site sous 5 minutes.
 
 `PRINTIFY_AUTO_PRODUCTION=false` laisse chaque commande « On hold » dans Printify pour que tu la valides. Passe à `true` quand tout est rodé.

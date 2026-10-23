@@ -2,24 +2,35 @@ import type { Product, ShippingAddress } from "./types";
 
 const API = "https://api.printify.com/v1";
 
-function config() {
-  const token = process.env.PRINTIFY_API_TOKEN;
-  const shopId = process.env.PRINTIFY_SHOP_ID;
-  if (!token || !shopId) throw new Error("PRINTIFY_API_TOKEN et PRINTIFY_SHOP_ID sont requis");
-  return { token, shopId };
+function token() {
+  const value = process.env.PRINTIFY_API_TOKEN;
+  if (!value) throw new Error("PRINTIFY_API_TOKEN est requis");
+  return value;
 }
 
 export function printifyConfigured() {
-  return Boolean(process.env.PRINTIFY_API_TOKEN && process.env.PRINTIFY_SHOP_ID);
+  return Boolean(process.env.PRINTIFY_API_TOKEN);
+}
+
+let detectedShopId: string | null = null;
+
+/** PRINTIFY_SHOP_ID si défini, sinon la boutique API du compte (ou à défaut la première) */
+async function shopId(): Promise<string> {
+  if (process.env.PRINTIFY_SHOP_ID) return process.env.PRINTIFY_SHOP_ID;
+  if (detectedShopId) return detectedShopId;
+  const shops = await call<{ id: number; title: string; sales_channel: string }[]>("/shops.json", { revalidate: 3600 });
+  const shop = shops.find((s) => s.sales_channel === "custom_integration") ?? shops[0];
+  if (!shop) throw new Error("Aucune boutique trouvée sur le compte Printify");
+  detectedShopId = String(shop.id);
+  return detectedShopId;
 }
 
 async function call<T>(path: string, init: RequestInit & { revalidate?: number } = {}): Promise<T> {
-  const { token } = config();
   const { revalidate, ...rest } = init;
   const res = await fetch(`${API}${path}`, {
     ...rest,
     headers: {
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${token()}`,
       "Content-Type": "application/json",
       "User-Agent": "pave-1968",
       ...rest.headers,
@@ -66,8 +77,8 @@ function normalize(p: RawProduct): Product {
 }
 
 export async function listProducts(): Promise<Product[]> {
-  const { shopId } = config();
-  const res = await call<{ data: RawProduct[] }>(`/shops/${shopId}/products.json?limit=50`, { revalidate: 300 });
+  const shop = await shopId();
+  const res = await call<{ data: RawProduct[] }>(`/shops/${shop}/products.json?limit=50`, { revalidate: 300 });
   // Un produit sur lequel tu as cliqué "Publish" reste "Publishing" (verrouillé) dans Printify
   // tant que le site n'a pas confirmé la publication : on la confirme ici.
   const publishing = res.data.filter((p) => p.is_locked);
@@ -76,17 +87,17 @@ export async function listProducts(): Promise<Product[]> {
 }
 
 async function confirmPublished(productId: string) {
-  const { shopId } = config();
-  await call(`/shops/${shopId}/products/${productId}/publishing_succeeded.json`, {
+  const shop = await shopId();
+  await call(`/shops/${shop}/products/${productId}/publishing_succeeded.json`, {
     method: "POST",
     body: JSON.stringify({ external: { id: productId, handle: `/produit/${productId}` } }),
   });
 }
 
 export async function getProduct(id: string): Promise<Product | null> {
-  const { shopId } = config();
+  const shop = await shopId();
   try {
-    return normalize(await call<RawProduct>(`/shops/${shopId}/products/${encodeURIComponent(id)}.json`, { revalidate: 300 }));
+    return normalize(await call<RawProduct>(`/shops/${shop}/products/${encodeURIComponent(id)}.json`, { revalidate: 300 }));
   } catch {
     return null;
   }
@@ -94,9 +105,9 @@ export async function getProduct(id: string): Promise<Product | null> {
 
 /** Version non mise en cache, utilisée pour fixer les prix au moment du paiement */
 export async function getProductFresh(id: string): Promise<Product | null> {
-  const { shopId } = config();
+  const shop = await shopId();
   try {
-    return normalize(await call<RawProduct>(`/shops/${shopId}/products/${encodeURIComponent(id)}.json`));
+    return normalize(await call<RawProduct>(`/shops/${shop}/products/${encodeURIComponent(id)}.json`));
   } catch {
     return null;
   }
@@ -107,8 +118,8 @@ export async function createOrder(order: {
   lineItems: { product_id: string; variant_id: number; quantity: number }[];
   address: ShippingAddress;
 }) {
-  const { shopId } = config();
-  const created = await call<{ id: string }>(`/shops/${shopId}/orders.json`, {
+  const shop = await shopId();
+  const created = await call<{ id: string }>(`/shops/${shop}/orders.json`, {
     method: "POST",
     body: JSON.stringify({
       external_id: order.externalId,
@@ -121,7 +132,7 @@ export async function createOrder(order: {
   });
 
   if (process.env.PRINTIFY_AUTO_PRODUCTION === "true") {
-    await call(`/shops/${shopId}/orders/${created.id}/send_to_production.json`, { method: "POST" });
+    await call(`/shops/${shop}/orders/${created.id}/send_to_production.json`, { method: "POST" });
   }
   return created;
 }
